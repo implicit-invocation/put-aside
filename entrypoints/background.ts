@@ -31,7 +31,7 @@ export default defineBackground(() => {
         workspaceData: currentWorkspaceData,
       },
     });
-    // await chrome.runtime.sendMessage({
+    // chrome.runtime.sendMessage({
     //   type: "currentWorkspaceUpdated",
     // });
   }, 200);

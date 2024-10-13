@@ -66,6 +66,7 @@ function App() {
   const [confirmingAction, setConfirmingAction] = useState<"switch" | "delete">(
     "switch"
   );
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [confirmingId, setConfirmingId] = useState<string | undefined>();
   const [currentWorkspace, setCurrentWorkspace] = useState<
     string | undefined
@@ -98,6 +99,29 @@ function App() {
     }
     setWorkspaces(currentWorkspaces);
   }, []);
+
+  const switchWorkspace = useCallback(async (confirmingId: string) => {
+    await chrome.storage.sync.set({
+      currentWorkspace: confirmingId,
+    });
+    const result = await chrome.storage.sync.get(
+      `workspaceData:${confirmingId}`
+    );
+    if (result[`workspaceData:${confirmingId}`]) {
+      const workspaceData = result[`workspaceData:${confirmingId}`];
+      await openWorkspace(workspaceData.workspaceData);
+      const updatedWorkspaceData = await getWorkspaceData();
+      await chrome.storage.sync.set({
+        [`workspaceData:${confirmingId}`]: {
+          name: workspaceData.name,
+          workspaceData: updatedWorkspaceData,
+        },
+      });
+    }
+    setConfirmingId(undefined);
+    reloadWorkspaces();
+  }, []);
+
   useEffect(() => {
     reloadWorkspaces();
     const cb = (msg: any) => {
@@ -111,10 +135,61 @@ function App() {
     };
   }, [reloadWorkspaces]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "=") {
+        e.preventDefault();
+        setAddingWorkspace(true);
+        setConfirmingId(undefined);
+        setTitleText("");
+        titleInputRef.current?.focus();
+      } else if (e.key === "1" || e.key === "2" || e.key === "3") {
+        if (addingWorkspace) return;
+        e.preventDefault();
+        setConfirmingAction("switch");
+        const index = e.key === "1" ? 0 : e.key === "2" ? 1 : 2;
+        if (currentWorkspace === workspaces[index]?.id) {
+          return;
+        }
+        setConfirmingId(workspaces[index]?.id);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        if (addingWorkspace) {
+          setAddingWorkspace(false);
+          setTitleText("");
+        } else if (confirmingId) {
+          setConfirmingId(undefined);
+        }
+      } else if (e.key === "Enter") {
+        if (addingWorkspace) {
+          return;
+        }
+        if (confirmingId && confirmingAction === "switch") {
+          e.preventDefault();
+          switchWorkspace(confirmingId);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    workspaces,
+    addingWorkspace,
+    confirmingId,
+    confirmingAction,
+    currentWorkspace,
+  ]);
+
   return (
     <div className="flex flex-col justify-start items-start w-full h-full pb-3 bg-gray-950 text-white gap-2">
+      <div className="p-3 pb-0 flex flex-row gap-2 justify-start items-center w-full">
+        <img src="./icon/128.png" alt="put aside logo" className="w-12 h-12" />
+        <div className="uppercase text-xl font-semibold">Put aside</div>
+      </div>
       <form
-        className="w-full flex flex-row gap-1 justify-start items-center p-3 pb-0"
+        className="w-full flex flex-row gap-1 justify-start items-center p-3 pb-0 pt-0"
         onSubmit={async (e) => {
           e.preventDefault();
           if (!titleText) {
@@ -149,6 +224,8 @@ function App() {
         {addingWorkspace && (
           <>
             <input
+              autoFocus
+              ref={titleInputRef}
               type="text"
               placeholder="Workspace name"
               className="flex-1 p-2 bg-gray-700 text-white rounded-lg"
@@ -175,7 +252,14 @@ function App() {
         )}
       </form>
       <div className="w-full flex flex-col gap-2 justify-start items-center">
-        {workspaces.map((workspace) => (
+        {workspaces.length === 0 && (
+          <div className="flex flex-col gap-2 justify-start items-center">
+            <div className="text-center text-xs italic">
+              You don't have any workspaces yet.
+            </div>
+          </div>
+        )}
+        {workspaces.map((workspace, i) => (
           <div
             key={workspace.id}
             className={[
@@ -185,7 +269,15 @@ function App() {
           >
             <div className="flex-1 flex flex-col gap-1 justify-start items-start">
               <div className="flex flex-row gap-2 justify-start items-center">
-                <FolderIcon />
+                <div
+                  className={[
+                    "w-6 h-6 flex justify-center items-center",
+                    i < 3 ? "border bg-gray-600 rounded-lg" : "",
+                  ].join(" ")}
+                >
+                  {i < 3 && <div>{i + 1}</div>}
+                  {i >= 3 && <FolderIcon />}
+                </div>
                 <div className="flex-1 line-clamp-1">
                   <span className="text-base">{workspace.name}</span>
                 </div>
@@ -237,29 +329,7 @@ function App() {
                       setConfirmingId(undefined);
                       reloadWorkspaces();
                     } else {
-                      if (currentWorkspace === confirmingId) {
-                        return;
-                      }
-                      await chrome.storage.sync.set({
-                        currentWorkspace: confirmingId,
-                      });
-                      const result = await chrome.storage.sync.get(
-                        `workspaceData:${confirmingId}`
-                      );
-                      if (result[`workspaceData:${confirmingId}`]) {
-                        const workspaceData =
-                          result[`workspaceData:${confirmingId}`];
-                        await openWorkspace(workspaceData.workspaceData);
-                        const updatedWorkspaceData = await getWorkspaceData();
-                        await chrome.storage.sync.set({
-                          [`workspaceData:${confirmingId}`]: {
-                            name: workspaceData.name,
-                            workspaceData: updatedWorkspaceData,
-                          },
-                        });
-                      }
-                      setConfirmingId(undefined);
-                      reloadWorkspaces();
+                      switchWorkspace(confirmingId);
                     }
                   }}
                 >
