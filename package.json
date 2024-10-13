@@ -1,6 +1,6 @@
 {
-  "name": "wxt-react-starter",
-  "description": "manifest.json description",
+  "name": "put-aside",
+  "description": "Let you put tabs and windows aside so you can focus on something else and come back to them later.",
   "private": true,
   "version": "0.0.0",
   "type": "module",
