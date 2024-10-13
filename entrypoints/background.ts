@@ -26,15 +26,6 @@ export default defineBackground(() => {
     const name = storedWorkspace[dataKey].name;
     const currentWorkspaceData = await getWorkspaceData();
     await saveWorkspaceData(currentWorkspace, currentWorkspaceData);
-    // await chrome.storage.sync.set({
-    //   [`workspaceData:${currentWorkspace}`]: {
-    //     name,
-    //     workspaceData: currentWorkspaceData,
-    //   },
-    // });
-    // chrome.runtime.sendMessage({
-    //   type: "currentWorkspaceUpdated",
-    // });
   }, 200);
   chrome.tabs.onCreated.addListener(() => {
     storeCurrentWorkspace();

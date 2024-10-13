@@ -47,34 +47,47 @@ export const getData = async (key: string) => {
   return data[key];
 };
 
+const openWindow = async (windowData: WindowData) => {
+  const window = await chrome.windows.create({
+    type: "normal",
+    url: windowData.tabs,
+  });
+  const createdTabs = await chrome.tabs.query({ windowId: window.id });
+  for (let j = 0; j < createdTabs.length; j++) {
+    const tab = createdTabs[j];
+    if (tab.url === undefined) continue;
+    if (windowData.focusTab === j && tab.id !== undefined) {
+      await chrome.tabs.update(tab.id, {
+        active: true,
+      });
+    }
+  }
+  return window;
+};
+
 export const openWorkspace = async (workspaceData: WorkspaceData) => {
   const currentWindows = await chrome.windows.getAll();
+  for (let i = 0; i < workspaceData.windows.length; i++) {
+    if (i === workspaceData.focusWindow) {
+      continue;
+    }
+    const windowData = workspaceData.windows[i];
+    await openWindow(windowData);
+  }
+  for (let i = 0; i < workspaceData.windows.length; i++) {
+    if (i !== workspaceData.focusWindow) {
+      continue;
+    }
+    const windowData = workspaceData.windows[i];
+    const window = await openWindow(windowData);
+    if (window.id === undefined) continue;
+    chrome.windows.update(window.id, {
+      focused: true,
+    });
+  }
   for (const window of currentWindows) {
     if (window.id === undefined) continue;
     await chrome.windows.remove(window.id);
-  }
-  for (let i = 0; i < workspaceData.windows.length; i++) {
-    const windowData = workspaceData.windows[i];
-    const window = await chrome.windows.create({
-      type: "normal",
-      url: windowData.tabs,
-    });
-    const createdTabs = await chrome.tabs.query({ windowId: window.id });
-    for (let j = 0; j < createdTabs.length; j++) {
-      const tab = createdTabs[j];
-      if (tab.url === undefined) continue;
-      if (windowData.focusTab === j && tab.id !== undefined) {
-        await chrome.tabs.update(tab.id, {
-          active: true,
-        });
-      }
-    }
-    if (i === workspaceData.focusWindow && window.id !== undefined) {
-      // TODO: not working
-      await chrome.windows.update(window.id, {
-        focused: true,
-      });
-    }
   }
 };
 
