@@ -348,8 +348,12 @@ function App() {
             <div
               className={[
                 "w-full flex flex-row gap-2 justify-start items-center px-3 py-2",
-                currentWorkspace === workspace.id ? "bg-gray-700" : "",
-                confirmingId === workspace.id ? "animate-pulse" : "",
+                confirmingId === undefined && currentWorkspace === workspace.id
+                  ? "bg-gray-700"
+                  : "",
+                confirmingId === workspace.id
+                  ? "bg-gray-700 border-2 border-orange-600"
+                  : "",
               ].join(" ")}
             >
               <div className="flex-1 flex flex-col gap-1 justify-start items-start">
