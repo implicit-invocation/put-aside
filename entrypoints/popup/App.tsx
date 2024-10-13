@@ -1,5 +1,14 @@
+import { arrayMoveImmutable, arrayMoveMutable } from "array-move";
 import { useState } from "react";
-import { getWorkspaceData, openWorkspace, WindowData } from "../common";
+import SortableList, { SortableItem } from "react-easy-sort";
+import {
+  getData,
+  getWorkspaceData,
+  openWorkspace,
+  saveWorkspaceData,
+  updateWorkspaceIndices,
+  WindowData,
+} from "../common";
 import "./App.css";
 
 const SwitchIcon = () => (
@@ -37,6 +46,27 @@ const FolderIcon = () => (
   </svg>
 );
 
+const GripIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <circle cx="9" cy="12" r="1" />
+    <circle cx="9" cy="5" r="1" />
+    <circle cx="9" cy="19" r="1" />
+    <circle cx="15" cy="12" r="1" />
+    <circle cx="15" cy="5" r="1" />
+    <circle cx="15" cy="19" r="1" />
+  </svg>
+);
+
 const TrashIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -62,6 +92,7 @@ function App() {
     { id: string; name: string; windows: number; tabs: number }[]
   >([]);
   const [addingWorkspace, setAddingWorkspace] = useState(false);
+  const [emptyWorkspace, setEmptyWorkspace] = useState(false);
   const [titleText, setTitleText] = useState("");
   const [confirmingAction, setConfirmingAction] = useState<"switch" | "delete">(
     "switch"
@@ -97,26 +128,21 @@ function App() {
         });
       }
     }
-    setWorkspaces(currentWorkspaces);
+    const indices = await getData("workspaceIndices");
+    setWorkspaces(
+      currentWorkspaces.sort((a, b) => indices[a.id] - indices[b.id])
+    );
   }, []);
 
   const switchWorkspace = useCallback(async (confirmingId: string) => {
     await chrome.storage.sync.set({
       currentWorkspace: confirmingId,
     });
-    const result = await chrome.storage.sync.get(
-      `workspaceData:${confirmingId}`
-    );
-    if (result[`workspaceData:${confirmingId}`]) {
-      const workspaceData = result[`workspaceData:${confirmingId}`];
+    const workspaceData = await getData(`workspaceData:${confirmingId}`);
+    if (workspaceData) {
       await openWorkspace(workspaceData.workspaceData);
       const updatedWorkspaceData = await getWorkspaceData();
-      await chrome.storage.sync.set({
-        [`workspaceData:${confirmingId}`]: {
-          name: workspaceData.name,
-          workspaceData: updatedWorkspaceData,
-        },
-      });
+      await saveWorkspaceData(confirmingId, updatedWorkspaceData);
     }
     setConfirmingId(undefined);
     reloadWorkspaces();
@@ -137,11 +163,13 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "=") {
+      if (e.key === "c" || e.key === "e") {
+        if (addingWorkspace) return;
         e.preventDefault();
         setAddingWorkspace(true);
         setConfirmingId(undefined);
         setTitleText("");
+        setEmptyWorkspace(e.key === "e");
         titleInputRef.current?.focus();
       } else if (e.key === "1" || e.key === "2" || e.key === "3") {
         if (addingWorkspace) return;
@@ -186,7 +214,7 @@ function App() {
     <div className="flex flex-col justify-start items-start w-full h-full pb-3 bg-gray-950 text-white gap-2">
       <div className="p-3 pb-0 flex flex-row gap-2 justify-start items-center w-full">
         <img src="./icon/128.png" alt="put aside logo" className="w-12 h-12" />
-        <div className="uppercase text-xl font-semibold">Put aside</div>
+        <div className="text-xl font-semibold">put-aside</div>
       </div>
       <form
         className="w-full flex flex-row gap-1 justify-start items-center p-3 pb-0 pt-0"
@@ -196,11 +224,42 @@ function App() {
             return;
           }
           const id = `workspace-${Date.now()}`;
+          if (emptyWorkspace) {
+            const windows = await chrome.windows.getAll();
+            await chrome.storage.sync.set({
+              [`workspaceData:${id}`]: {
+                name: titleText,
+                workspaceData: {
+                  windows: [
+                    {
+                      id: 0,
+                      tabs: [],
+                      focusTab: 0,
+                    },
+                  ],
+                  focusWindow: 0,
+                },
+                index: workspaces.length,
+              },
+              currentWorkspace: id,
+            });
+            await updateWorkspaceIndices([...workspaces.map((w) => w.id), id]);
+            for (let i = 0; i < windows.length; i++) {
+              const window = windows[i];
+              if (window.id === undefined) continue;
+              await chrome.windows.remove(window.id);
+            }
+            await chrome.windows.create({
+              type: "normal",
+            });
+            return;
+          }
           const workspaceData = await getWorkspaceData();
           await chrome.storage.sync.set({
             [`workspaceData:${id}`]: {
               name: titleText,
               workspaceData,
+              index: workspaces.length,
             },
             currentWorkspace: id,
           });
@@ -210,16 +269,30 @@ function App() {
         }}
       >
         {!addingWorkspace && (
-          <button
-            role="button"
-            type="button"
-            className="w-full p-2 bg-gray-800 text-white rounded-lg"
-            onClick={async () => {
-              setAddingWorkspace(true);
-            }}
-          >
-            + New workspace
-          </button>
+          <div className="flex flex-col gap-2 justify-start items-center w-full">
+            <button
+              role="button"
+              type="button"
+              className="w-full p-2 bg-gray-800 text-white rounded-lg"
+              onClick={async () => {
+                setAddingWorkspace(true);
+                setEmptyWorkspace(false);
+              }}
+            >
+              + Workspace with current tabs (C)
+            </button>
+            <button
+              role="button"
+              type="button"
+              className="w-full p-2 bg-gray-800 text-white rounded-lg"
+              onClick={async () => {
+                setAddingWorkspace(true);
+                setEmptyWorkspace(true);
+              }}
+            >
+              + Empty workspace (E)
+            </button>
+          </div>
         )}
         {addingWorkspace && (
           <>
@@ -251,7 +324,18 @@ function App() {
           </>
         )}
       </form>
-      <div className="w-full flex flex-col gap-2 justify-start items-center">
+      <SortableList
+        onSortEnd={async (oldIndex, newIndex) => {
+          if (oldIndex === newIndex) return;
+          const ids = workspaces.map((w) => w.id);
+          arrayMoveMutable(ids, oldIndex, newIndex);
+          setWorkspaces(arrayMoveImmutable(workspaces, oldIndex, newIndex));
+          await updateWorkspaceIndices(ids);
+          reloadWorkspaces();
+        }}
+        className="w-full flex flex-col gap-2 justify-start items-center"
+        draggedItemClassName="text-white"
+      >
         {workspaces.length === 0 && (
           <div className="flex flex-col gap-2 justify-start items-center">
             <div className="text-center text-xs italic">
@@ -260,94 +344,103 @@ function App() {
           </div>
         )}
         {workspaces.map((workspace, i) => (
-          <div
-            key={workspace.id}
-            className={[
-              "w-full flex flex-row gap-2 justify-start items-center px-3 py-2",
-              currentWorkspace === workspace.id ? "bg-gray-700" : "",
-            ].join(" ")}
-          >
-            <div className="flex-1 flex flex-col gap-1 justify-start items-start">
-              <div className="flex flex-row gap-2 justify-start items-center">
-                <div
-                  className={[
-                    "w-6 h-6 flex justify-center items-center",
-                    i < 3 ? "border bg-gray-600 rounded-lg" : "",
-                  ].join(" ")}
-                >
-                  {i < 3 && <div>{i + 1}</div>}
-                  {i >= 3 && <FolderIcon />}
+          <SortableItem key={workspace.id}>
+            <div
+              className={[
+                "w-full flex flex-row gap-2 justify-start items-center px-3 py-2",
+                currentWorkspace === workspace.id ? "bg-gray-700" : "",
+              ].join(" ")}
+            >
+              <div className="flex-1 flex flex-col gap-1 justify-start items-start">
+                <div className="flex flex-row gap-2 justify-start items-center">
+                  <div className="cursor-move">
+                    <GripIcon />
+                  </div>
+                  <div
+                    className={[
+                      "w-6 h-6 flex justify-center items-center",
+                      i < 3 ? "border bg-gray-600 rounded-lg" : "",
+                    ].join(" ")}
+                  >
+                    {i < 3 && <div>{i + 1}</div>}
+                    {i >= 3 && <FolderIcon />}
+                  </div>
+                  <div className="flex-1 line-clamp-1">
+                    <span className="text-base">{workspace.name}</span>
+                  </div>
                 </div>
-                <div className="flex-1 line-clamp-1">
-                  <span className="text-base">{workspace.name}</span>
+                <div className="text-xs line-clamp-1">
+                  {workspace.windows} windows - {workspace.tabs} tabs
                 </div>
               </div>
-              <div className="text-xs">
-                {workspace.windows} windows - {workspace.tabs} tabs
-              </div>
-            </div>
-            {confirmingId !== workspace.id ? (
-              <div className="flex gap-1">
-                <button
-                  className="p-2 bg-gray-800 text-white rounded-lg disabled:opacity-20"
-                  disabled={currentWorkspace === workspace.id}
-                  onClick={async () => {
-                    if (currentWorkspace === workspace.id) {
-                      return;
-                    }
-                    setConfirmingId(workspace.id);
-                    setConfirmingAction("switch");
-                  }}
-                >
-                  <SwitchIcon />
-                </button>
-                <button
-                  className="p-2 bg-gray-800 text-white rounded-lg"
-                  onClick={async () => {
-                    setConfirmingAction("delete");
-                    setConfirmingId(workspace.id);
-                  }}
-                >
-                  <TrashIcon />
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-1 justify-center items-center">
-                <div className="text-xs font-bold">
-                  {confirmingAction === "switch" ? "Switch" : "Delete"}?
-                </div>
-                <button
-                  className="p-2 bg-gray-800 text-white rounded-lg"
-                  onClick={async () => {
-                    if (confirmingAction === "delete") {
-                      await chrome.storage.sync.remove(
-                        `workspaceData:${confirmingId}`
-                      );
-                      if (currentWorkspace === confirmingId) {
-                        await chrome.storage.sync.remove("currentWorkspace");
+              {confirmingId !== workspace.id ? (
+                <div className="flex gap-1">
+                  <button
+                    className="p-2 bg-gray-800 text-white rounded-lg disabled:opacity-20"
+                    disabled={currentWorkspace === workspace.id}
+                    onClick={async () => {
+                      if (currentWorkspace === workspace.id) {
+                        return;
                       }
+                      setConfirmingId(workspace.id);
+                      setConfirmingAction("switch");
+                    }}
+                  >
+                    <SwitchIcon />
+                  </button>
+                  <button
+                    className="p-2 bg-gray-800 text-white rounded-lg"
+                    onClick={async () => {
+                      setConfirmingAction("delete");
+                      setConfirmingId(workspace.id);
+                    }}
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-1 justify-center items-center">
+                  <div className="text-xs font-bold">
+                    {confirmingAction === "switch" ? "Switch" : "Delete"}?
+                  </div>
+                  <button
+                    className="p-2 bg-gray-800 text-white rounded-lg"
+                    onClick={async () => {
+                      if (confirmingAction === "delete") {
+                        await chrome.storage.sync.remove(
+                          `workspaceData:${confirmingId}`
+                        );
+                        await updateWorkspaceIndices(
+                          workspaces
+                            .filter((w) => w.id !== confirmingId)
+                            .map((w) => w.id)
+                        );
+                        if (currentWorkspace === confirmingId) {
+                          await chrome.storage.sync.remove("currentWorkspace");
+                        }
+                        setConfirmingId(undefined);
+                        reloadWorkspaces();
+                      } else {
+                        switchWorkspace(confirmingId);
+                      }
+                    }}
+                  >
+                    Ok ⏎
+                  </button>
+                  <button
+                    className="p-2 bg-gray-800 text-white rounded-lg"
+                    onClick={() => {
                       setConfirmingId(undefined);
-                      reloadWorkspaces();
-                    } else {
-                      switchWorkspace(confirmingId);
-                    }
-                  }}
-                >
-                  Ok
-                </button>
-                <button
-                  className="p-2 bg-gray-800 text-white rounded-lg"
-                  onClick={() => {
-                    setConfirmingId(undefined);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          </SortableItem>
         ))}
-      </div>
+      </SortableList>
     </div>
   );
 }

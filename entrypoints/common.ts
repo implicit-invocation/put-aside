@@ -42,6 +42,11 @@ export const getWorkspaceData = async () => {
   return currentWorkspaceData;
 };
 
+export const getData = async (key: string) => {
+  const data = await chrome.storage.sync.get(key);
+  return data[key];
+};
+
 export const openWorkspace = async (workspaceData: WorkspaceData) => {
   const currentWindows = await chrome.windows.getAll();
   for (const window of currentWindows) {
@@ -71,6 +76,31 @@ export const openWorkspace = async (workspaceData: WorkspaceData) => {
       });
     }
   }
+};
+
+export const saveWorkspaceData = async (
+  id: string,
+  workspaceData: WorkspaceData
+) => {
+  const data = await getData(`workspaceData:${id}`);
+  if (data) {
+    await chrome.storage.sync.set({
+      [`workspaceData:${id}`]: {
+        ...data,
+        workspaceData,
+      },
+    });
+  }
+};
+
+export const updateWorkspaceIndices = async (ids: string[]) => {
+  const indices: { [id: string]: number } = {};
+  for (let i = 0; i < ids.length; i++) {
+    indices[ids[i]] = i;
+  }
+  await chrome.storage.sync.set({
+    workspaceIndices: indices,
+  });
 };
 
 export default {};

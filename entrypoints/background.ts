@@ -1,4 +1,4 @@
-import { getWorkspaceData } from "./common";
+import { getWorkspaceData, saveWorkspaceData } from "./common";
 
 function debounce(fn: () => void, ms: number) {
   let timeout: NodeJS.Timeout | undefined;
@@ -25,12 +25,13 @@ export default defineBackground(() => {
     }
     const name = storedWorkspace[dataKey].name;
     const currentWorkspaceData = await getWorkspaceData();
-    await chrome.storage.sync.set({
-      [`workspaceData:${currentWorkspace}`]: {
-        name,
-        workspaceData: currentWorkspaceData,
-      },
-    });
+    await saveWorkspaceData(currentWorkspace, currentWorkspaceData);
+    // await chrome.storage.sync.set({
+    //   [`workspaceData:${currentWorkspace}`]: {
+    //     name,
+    //     workspaceData: currentWorkspaceData,
+    //   },
+    // });
     // chrome.runtime.sendMessage({
     //   type: "currentWorkspaceUpdated",
     // });
