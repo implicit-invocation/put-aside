@@ -2,7 +2,7 @@
   "name": "put-aside",
   "description": "Let you put tabs/windows aside so you can focus on something else and come back later.",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",

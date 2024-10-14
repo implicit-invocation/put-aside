@@ -34,7 +34,7 @@ export const getWorkspaceData = async () => {
     });
     for (let j = 0; j < tabs.length; j++) {
       const tab = tabs[j];
-      if (window.focused) {
+      if (window.focused || windows.length === 1) {
         currentWorkspaceData.icons?.push(tab.favIconUrl || undefined);
       }
       if (tab.url === undefined) continue;
