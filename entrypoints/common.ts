@@ -7,12 +7,14 @@ export type WindowData = {
 export type WorkspaceData = {
   windows: WindowData[];
   focusWindow: number;
+  icons?: (string | undefined)[];
 };
 
 export const getWorkspaceData = async () => {
   const currentWorkspaceData: WorkspaceData = {
     windows: [],
     focusWindow: 0,
+    icons: [],
   };
   const windows = await chrome.windows.getAll();
   for (let i = 0; i < windows.length; i++) {
@@ -32,6 +34,9 @@ export const getWorkspaceData = async () => {
     });
     for (let j = 0; j < tabs.length; j++) {
       const tab = tabs[j];
+      if (window.focused) {
+        currentWorkspaceData.icons?.push(tab.favIconUrl || undefined);
+      }
       if (tab.url === undefined) continue;
       windowData.tabs.push(tab.url);
       if (tab.active) {
@@ -50,6 +55,8 @@ export const getData = async (key: string) => {
 const openWindow = async (windowData: WindowData) => {
   const window = await chrome.windows.create({
     type: "normal",
+    focused: true,
+    state: "maximized",
     url: windowData.tabs,
   });
   const createdTabs = await chrome.tabs.query({ windowId: window.id });

@@ -89,7 +89,13 @@ const TrashIcon = () => (
 
 function App() {
   const [workspaces, setWorkspaces] = useState<
-    { id: string; name: string; windows: number; tabs: number }[]
+    {
+      id: string;
+      name: string;
+      windows: number;
+      tabs: number;
+      icons?: (string | undefined)[];
+    }[]
   >([]);
   const [addingWorkspace, setAddingWorkspace] = useState(false);
   const [emptyWorkspace, setEmptyWorkspace] = useState(false);
@@ -112,6 +118,7 @@ function App() {
       name: string;
       windows: number;
       tabs: number;
+      icons?: (string | undefined)[];
     }[] = [];
     for (const key of Object.keys(data)) {
       if (key.startsWith("workspaceData:")) {
@@ -121,6 +128,7 @@ function App() {
           id,
           name: workspaceData.name,
           windows: workspaceData.workspaceData.windows.length,
+          icons: workspaceData.workspaceData.icons,
           tabs: workspaceData.workspaceData.windows.reduce(
             (acc: number, w: WindowData) => acc + w.tabs.length,
             0
@@ -244,14 +252,16 @@ function App() {
               currentWorkspace: id,
             });
             await updateWorkspaceIndices([...workspaces.map((w) => w.id), id]);
+            await chrome.windows.create({
+              type: "normal",
+              focused: true,
+              state: "maximized",
+            });
             for (let i = 0; i < windows.length; i++) {
               const window = windows[i];
               if (window.id === undefined) continue;
               await chrome.windows.remove(window.id);
             }
-            await chrome.windows.create({
-              type: "normal",
-            });
             return;
           }
           const workspaceData = await getWorkspaceData();
@@ -376,6 +386,11 @@ function App() {
                 </div>
                 <div className="text-xs line-clamp-1">
                   {workspace.windows} windows - {workspace.tabs} tabs
+                </div>
+                <div className="flex gap-1.5 justify-start items-center overflow-hidden">
+                  {workspace.icons?.map((icon, j) => (
+                    <img key={j} className="w-4 h-4" src={icon} alt="" />
+                  ))}
                 </div>
               </div>
               {confirmingId !== workspace.id ? (

@@ -3,11 +3,11 @@ import { defineConfig } from "wxt";
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   manifest: {
-    permissions: ["activeTab", "storage"],
+    permissions: ["activeTab", "storage", "tabs", "windows"],
     commands: {
       _execute_action: {
         suggested_key: {
-          default: "Ctrl+K",
+          default: "Alt+K",
           mac: "Command+K",
         },
       },
