@@ -43,7 +43,7 @@ export const getWorkspaceData = async () => {
 };
 
 export const getData = async (key: string) => {
-  const data = await chrome.storage.sync.get(key);
+  const data = await chrome.storage.local.get(key);
   return data[key];
 };
 
@@ -97,7 +97,7 @@ export const saveWorkspaceData = async (
 ) => {
   const data = await getData(`workspaceData:${id}`);
   if (data) {
-    await chrome.storage.sync.set({
+    await chrome.storage.local.set({
       [`workspaceData:${id}`]: {
         ...data,
         workspaceData,
@@ -111,7 +111,7 @@ export const updateWorkspaceIndices = async (ids: string[]) => {
   for (let i = 0; i < ids.length; i++) {
     indices[ids[i]] = i;
   }
-  await chrome.storage.sync.set({
+  await chrome.storage.local.set({
     workspaceIndices: indices,
   });
 };

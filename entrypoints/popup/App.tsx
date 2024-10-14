@@ -103,7 +103,7 @@ function App() {
     string | undefined
   >();
   const reloadWorkspaces = useCallback(async () => {
-    const data = await chrome.storage.sync.get(null);
+    const data = await chrome.storage.local.get(null);
     if (data.currentWorkspace) {
       setCurrentWorkspace(data.currentWorkspace);
     }
@@ -135,7 +135,7 @@ function App() {
   }, []);
 
   const switchWorkspace = useCallback(async (confirmingId: string) => {
-    await chrome.storage.sync.set({
+    await chrome.storage.local.set({
       currentWorkspace: confirmingId,
     });
     const workspaceData = await getData(`workspaceData:${confirmingId}`);
@@ -226,7 +226,7 @@ function App() {
           const id = `workspace-${Date.now()}`;
           if (emptyWorkspace) {
             const windows = await chrome.windows.getAll();
-            await chrome.storage.sync.set({
+            await chrome.storage.local.set({
               [`workspaceData:${id}`]: {
                 name: titleText,
                 workspaceData: {
@@ -255,7 +255,7 @@ function App() {
             return;
           }
           const workspaceData = await getWorkspaceData();
-          await chrome.storage.sync.set({
+          await chrome.storage.local.set({
             [`workspaceData:${id}`]: {
               name: titleText,
               workspaceData,
@@ -412,7 +412,7 @@ function App() {
                     className="p-2 bg-gray-800 text-white rounded-lg"
                     onClick={async () => {
                       if (confirmingAction === "delete") {
-                        await chrome.storage.sync.remove(
+                        await chrome.storage.local.remove(
                           `workspaceData:${confirmingId}`
                         );
                         await updateWorkspaceIndices(
@@ -421,7 +421,7 @@ function App() {
                             .map((w) => w.id)
                         );
                         if (currentWorkspace === confirmingId) {
-                          await chrome.storage.sync.remove("currentWorkspace");
+                          await chrome.storage.local.remove("currentWorkspace");
                         }
                         setConfirmingId(undefined);
                         reloadWorkspaces();

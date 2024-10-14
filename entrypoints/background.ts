@@ -12,14 +12,14 @@ function debounce(fn: () => void, ms: number) {
 
 export default defineBackground(() => {
   const storeCurrentWorkspace = debounce(async () => {
-    const { currentWorkspace } = await chrome.storage.sync.get(
+    const { currentWorkspace } = await chrome.storage.local.get(
       "currentWorkspace"
     );
     if (!currentWorkspace) {
       return;
     }
     const dataKey = `workspaceData:${currentWorkspace}`;
-    const storedWorkspace = await chrome.storage.sync.get(dataKey);
+    const storedWorkspace = await chrome.storage.local.get(dataKey);
     if (!storedWorkspace[dataKey]) {
       return;
     }
