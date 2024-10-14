@@ -11,6 +11,9 @@ export type WorkspaceData = {
 };
 
 export const getWorkspaceData = async () => {
+  const lastFocusedWindow = await chrome.windows.getLastFocused({
+    windowTypes: ["normal"],
+  });
   const currentWorkspaceData: WorkspaceData = {
     windows: [],
     focusWindow: 0,
@@ -20,8 +23,14 @@ export const getWorkspaceData = async () => {
   for (let i = 0; i < windows.length; i++) {
     const window = windows[i];
     if (window.id === undefined) continue;
-    if (window.focused) {
+    const tabs = await chrome.tabs.query({
+      windowId: window.id,
+    });
+    if (window.id === lastFocusedWindow.id) {
       currentWorkspaceData.focusWindow = i;
+      currentWorkspaceData.icons?.push(
+        ...tabs.slice(0, 10).map((t) => t.favIconUrl)
+      );
     }
     const windowData: WindowData = {
       id: window.id,
@@ -29,14 +38,8 @@ export const getWorkspaceData = async () => {
       focusTab: 0,
     };
     currentWorkspaceData.windows.push(windowData);
-    const tabs = await chrome.tabs.query({
-      windowId: window.id,
-    });
     for (let j = 0; j < tabs.length; j++) {
       const tab = tabs[j];
-      if (window.focused || windows.length === 1) {
-        currentWorkspaceData.icons?.push(tab.favIconUrl || undefined);
-      }
       if (tab.url === undefined) continue;
       windowData.tabs.push(tab.url);
       if (tab.active) {
@@ -75,10 +78,10 @@ const openWindow = async (windowData: WindowData) => {
 export const openWorkspace = async (workspaceData: WorkspaceData) => {
   const currentWindows = await chrome.windows.getAll();
   for (let i = 0; i < workspaceData.windows.length; i++) {
+    const windowData = workspaceData.windows[i];
     if (i === workspaceData.focusWindow) {
       continue;
     }
-    const windowData = workspaceData.windows[i];
     await openWindow(windowData);
   }
   for (let i = 0; i < workspaceData.windows.length; i++) {
@@ -88,7 +91,7 @@ export const openWorkspace = async (workspaceData: WorkspaceData) => {
     const windowData = workspaceData.windows[i];
     const window = await openWindow(windowData);
     if (window.id === undefined) continue;
-    chrome.windows.update(window.id, {
+    await chrome.windows.update(window.id, {
       focused: true,
     });
   }

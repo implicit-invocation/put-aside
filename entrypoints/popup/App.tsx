@@ -273,6 +273,7 @@ function App() {
             },
             currentWorkspace: id,
           });
+          await updateWorkspaceIndices([...workspaces.map((w) => w.id), id]);
           setTitleText("");
           setAddingWorkspace(false);
           reloadWorkspaces();
